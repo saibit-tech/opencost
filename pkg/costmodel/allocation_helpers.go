@@ -1816,7 +1816,6 @@ func buildPVMap(resolution time.Duration, pvMap map[pvKey]*pv, resPVCostPerGiBHo
 			Start:   pvStart,
 			End:     pvEnd,
 		}
-		// TODO
 	}
 
 	for _, result := range resPVCostPerGiBHour {
@@ -1851,7 +1850,6 @@ func buildPVMap(resolution time.Duration, pvMap map[pvKey]*pv, resPVCostPerGiBHo
 				continue
 			}
 			pvMap[key].ProviderID = provId
-
 		}
 
 	}
