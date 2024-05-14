@@ -1849,6 +1849,14 @@ func buildPVMap(resolution time.Duration, pvMap map[pvKey]*pv, resPVCostPerGiBHo
 				continue
 			}
 			pvMap[key].ProviderID = provId
+
+			storageClass, err := result.GetString("storageclass")
+			if err != nil {
+				log.Warnf("error getting storage class for PV %v: %v", key, err)
+				continue
+			}
+			pvMap[key].StorageClass = storageClass
+
 		}
 
 	}
@@ -1908,6 +1916,7 @@ func buildPVCMap(resolution time.Duration, pvcMap map[pvcKey]*pvc, pvMap map[pvK
 		}
 
 		pvMap[pvKey].StorageClass = storageClass
+		pvMap[pvKey].Name = name
 
 		if _, ok := pvcMap[pvcKey]; !ok {
 			pvcMap[pvcKey] = &pvc{}
@@ -2072,6 +2081,7 @@ func applyPVCsToPods(window opencost.Window, podMap map[podKey]*pod, podPVCMap m
 			}
 			for _, alloc := range pod.Allocations {
 				name := pvc.Name
+				storageClass := pvc.StorageClass
 
 				s, e := pod.Start, pod.End
 
@@ -2099,10 +2109,11 @@ func applyPVCsToPods(window opencost.Window, podMap map[podKey]*pod, podPVCMap m
 				// would be equal to the values of the original pv
 				count := float64(len(pod.Allocations))
 				alloc.PVs[pvKey] = &opencost.PVAllocation{
-					Name:       name,
-					ByteHours:  byteHours * coef / count,
-					Cost:       cost * coef / count,
-					ProviderID: pvc.Volume.ProviderID,
+					Name:         name,
+					StorageClass: storageClass,
+					ByteHours:    byteHours * coef / count,
+					Cost:         cost * coef / count,
+					ProviderID:   pvc.Volume.ProviderID,
 				}
 			}
 		}
