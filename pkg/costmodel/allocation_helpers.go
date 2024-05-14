@@ -2081,6 +2081,7 @@ func applyPVCsToPods(window opencost.Window, podMap map[podKey]*pod, podPVCMap m
 			}
 			for _, alloc := range pod.Allocations {
 				name := pvc.Name
+				storageClass := pvc.StorageClass
 
 				s, e := pod.Start, pod.End
 
@@ -2108,10 +2109,11 @@ func applyPVCsToPods(window opencost.Window, podMap map[podKey]*pod, podPVCMap m
 				// would be equal to the values of the original pv
 				count := float64(len(pod.Allocations))
 				alloc.PVs[pvKey] = &opencost.PVAllocation{
-					Name:       name,
-					ByteHours:  byteHours * coef / count,
-					Cost:       cost * coef / count,
-					ProviderID: pvc.Volume.ProviderID,
+					Name:         name,
+					StorageClass: storageClass,
+					ByteHours:    byteHours * coef / count,
+					Cost:         cost * coef / count,
+					ProviderID:   pvc.Volume.ProviderID,
 				}
 			}
 		}
