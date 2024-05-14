@@ -1849,6 +1849,14 @@ func buildPVMap(resolution time.Duration, pvMap map[pvKey]*pv, resPVCostPerGiBHo
 				continue
 			}
 			pvMap[key].ProviderID = provId
+
+			storageClass, err := result.GetString("storageclass")
+			if err != nil {
+				log.Warnf("error getting storage class for PV %v: %v", key, err)
+				continue
+			}
+			pvMap[key].StorageClass = storageClass
+
 		}
 
 	}
@@ -1908,6 +1916,7 @@ func buildPVCMap(resolution time.Duration, pvcMap map[pvcKey]*pvc, pvMap map[pvK
 		}
 
 		pvMap[pvKey].StorageClass = storageClass
+		pvMap[pvKey].Name = name
 
 		if _, ok := pvcMap[pvcKey]; !ok {
 			pvcMap[pvcKey] = &pvc{}
