@@ -259,6 +259,25 @@ func (pv PVAllocations) Add(that PVAllocations) PVAllocations {
 	return apv
 }
 
+// Add adds contents of that to the calling PVAllocations
+func (pvc PVCAllocations) Add(that PVCAllocations) PVCAllocations {
+	apvc := pvc.Clone()
+	if that != nil {
+		if apvc == nil {
+			apvc = PVCAllocations{}
+		}
+		for pvcKey, thatPVCAlloc := range that {
+			apvcAlloc, ok := apvc[pvcKey]
+			if !ok {
+				apvcAlloc = &PVCAllocation{}
+			}
+			apvcAlloc.Capacity += thatPVCAlloc.Capacity
+			apvc[pvcKey] = apvcAlloc
+		}
+	}
+	return apvc
+}
+
 // Equal returns true if the two PVAllocations are equal in length and contain the same keys
 // and values.
 func (this PVAllocations) Equal(that PVAllocations) bool {
@@ -302,7 +321,7 @@ func (pvc PVCAllocations) Clone() PVCAllocations {
 			StorageClass: v.StorageClass,
 			Capacity:     v.Capacity,
 			Volume:       v.Volume,
-			Pod:          v.Pod,
+			Namespace:    v.Namespace,
 		}
 	}
 	return clonePVC
@@ -399,7 +418,8 @@ type PVCAllocation struct {
 	StorageClass string  `json:"storageClass"`
 	Capacity     float64 `json:"capacity"`
 	Volume       string  `json:"volume"`
-	Pod          string  `json:"pod"`
+	Name         string  `json:"name"`
+	Namespace    string  `json:"namespace"`
 }
 
 // Equal returns true if the two PVAllocation instances contain approximately the same
@@ -762,6 +782,7 @@ func (a *Allocation) Clone() *Allocation {
 		LoadBalancerCost:               a.LoadBalancerCost,
 		LoadBalancerCostAdjustment:     a.LoadBalancerCostAdjustment,
 		PVs:                            a.PVs.Clone(),
+		PVCs:                           a.PVCs.Clone(),
 		PVCostAdjustment:               a.PVCostAdjustment,
 		RAMByteHours:                   a.RAMByteHours,
 		RAMBytesRequestAverage:         a.RAMBytesRequestAverage,

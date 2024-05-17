@@ -124,6 +124,15 @@ func (p *pvc) key() pvcKey {
 	return newPVCKey(p.Cluster, p.Namespace, p.Name)
 }
 
+type customPVC struct {
+	Name         string    `json:"name"`
+	StorageClass string    `json:"storageClass"`
+	Capacity     float64   `json:"capacity"`
+	Namespace    string    `json:"namespace"`
+	Start        time.Time `json:"start"`
+	End          time.Time `json:"end"`
+}
+
 // pv describes a PersistentVolume
 type pv struct {
 	Start          time.Time `json:"start"`
