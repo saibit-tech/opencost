@@ -76,6 +76,7 @@ type Allocation struct {
 	LoadBalancerCost           float64               `json:"loadBalancerCost"`
 	LoadBalancerCostAdjustment float64               `json:"loadBalancerCostAdjustment"`
 	PVs                        PVAllocations         `json:"pvs"`
+	PVCs                       PVCAllocations        `json:"pvcs"`
 	PVCostAdjustment           float64               `json:"pvCostAdjustment"`
 	RAMByteHours               float64               `json:"ramByteHours"`
 	RAMBytesRequestAverage     float64               `json:"ramByteRequestAverage"`
@@ -258,6 +259,25 @@ func (pv PVAllocations) Add(that PVAllocations) PVAllocations {
 	return apv
 }
 
+// Add adds contents of that to the calling PVAllocations
+func (pvc PVCAllocations) Add(that PVCAllocations) PVCAllocations {
+	apvc := pvc.Clone()
+	if that != nil {
+		if apvc == nil {
+			apvc = PVCAllocations{}
+		}
+		for pvcKey, thatPVCAlloc := range that {
+			apvcAlloc, ok := apvc[pvcKey]
+			if !ok {
+				apvcAlloc = &PVCAllocation{}
+			}
+			apvcAlloc.Capacity += thatPVCAlloc.Capacity
+			apvc[pvcKey] = apvcAlloc
+		}
+	}
+	return apvc
+}
+
 // Equal returns true if the two PVAllocations are equal in length and contain the same keys
 // and values.
 func (this PVAllocations) Equal(that PVAllocations) bool {
@@ -285,6 +305,53 @@ func (this PVAllocations) Equal(that PVAllocations) bool {
 func (pvs PVAllocations) SanitizeNaN() {
 	for _, pv := range pvs {
 		pv.SanitizeNaN()
+	}
+}
+
+type PVCAllocations map[string]*PVCAllocation
+
+// Clone creates a deep copy of a PVCAllocations
+func (pvc PVCAllocations) Clone() PVCAllocations {
+	if pvc == nil {
+		return nil
+	}
+	clonePVC := make(map[string]*PVCAllocation, len(pvc))
+	for k, v := range pvc {
+		clonePVC[k] = &PVCAllocation{
+			StorageClass: v.StorageClass,
+			Capacity:     v.Capacity,
+			Volume:       v.Volume,
+			Namespace:    v.Namespace,
+		}
+	}
+	return clonePVC
+}
+
+func (this PVCAllocations) Equal(that PVCAllocations) bool {
+	if this == nil && that == nil {
+		return true
+	}
+	if this == nil || that == nil {
+		return false
+	}
+
+	if len(this) != len(that) {
+		return false
+	}
+
+	for k, pvc := range this {
+		tv, ok := that[k]
+		if !ok || !pvc.Equal(tv) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (pvcs PVCAllocations) SanitizeNaN() {
+	for _, pvc := range pvcs {
+		pvc.SanitizeNaN()
 	}
 }
 
@@ -344,6 +411,36 @@ func (pva *PVAllocation) SanitizeNaN() {
 	if math.IsNaN(pva.Cost) {
 		log.DedupedWarningf(5, "PVAllocation: Unexpected NaN found for Cost")
 		pva.Cost = 0
+	}
+}
+
+type PVCAllocation struct {
+	StorageClass string  `json:"storageClass"`
+	Capacity     float64 `json:"capacity"`
+	Volume       string  `json:"volume"`
+	Name         string  `json:"name"`
+	Namespace    string  `json:"namespace"`
+}
+
+// Equal returns true if the two PVAllocation instances contain approximately the same
+// values.
+func (pvca *PVCAllocation) Equal(that *PVCAllocation) bool {
+	if pvca == nil && that == nil {
+		return true
+	}
+	if pvca == nil || that == nil {
+		return false
+	}
+	return util.IsApproximately(pvca.Capacity, that.Capacity)
+}
+
+func (pvca *PVCAllocation) SanitizeNaN() {
+	if pvca == nil {
+		return
+	}
+	if math.IsNaN(pvca.Capacity) {
+		log.DedupedWarningf(5, "PVCAllocation: Unexpected NaN found for Capacity")
+		pvca.Capacity = 0
 	}
 }
 
@@ -685,6 +782,7 @@ func (a *Allocation) Clone() *Allocation {
 		LoadBalancerCost:               a.LoadBalancerCost,
 		LoadBalancerCostAdjustment:     a.LoadBalancerCostAdjustment,
 		PVs:                            a.PVs.Clone(),
+		PVCs:                           a.PVCs.Clone(),
 		PVCostAdjustment:               a.PVCostAdjustment,
 		RAMByteHours:                   a.RAMByteHours,
 		RAMBytesRequestAverage:         a.RAMBytesRequestAverage,
@@ -794,6 +892,10 @@ func (a *Allocation) Equal(that *Allocation) bool {
 	}
 
 	if !a.PVs.Equal(that.PVs) {
+		return false
+	}
+
+	if !a.PVCs.Equal(that.PVCs) {
 		return false
 	}
 
@@ -2614,6 +2716,7 @@ func (a *Allocation) SanitizeNaN() {
 	}
 
 	a.PVs.SanitizeNaN()
+	a.PVCs.SanitizeNaN()
 	a.RawAllocationOnly.SanitizeNaN()
 	a.ProportionalAssetResourceCosts.SanitizeNaN()
 	a.SharedCostBreakdown.SanitizeNaN()

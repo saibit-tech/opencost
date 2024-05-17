@@ -1923,6 +1923,47 @@ func buildPVCMap(resolution time.Duration, pvcMap map[pvcKey]*pvc, pvMap map[pvK
 	}
 }
 
+func buildCustomPVCMap(resolution time.Duration, customPVCMap map[string]*customPVC, resPVCapacityBytes []*prom.QueryResult, resPVCInfoSimple []*prom.QueryResult, window opencost.Window) {
+	for _, res := range resPVCInfoSimple {
+		values, err := res.GetStrings("namespace", "persistentvolumeclaim", "storageclass", "volumename")
+		if err != nil {
+			log.DedupedWarningf(10, "CostModel.ComputeAllocation: pvc info query result missing field: %s", err)
+			continue
+		}
+
+		namespace := values["namespace"]
+		name := values["persistentvolumeclaim"]
+		volume := values["volumename"]
+		storageClass := values["storageclass"]
+
+		key := volume
+
+		pvcStart, pvcEnd := calculateStartAndEnd(res, resolution, window)
+		if pvcStart.IsZero() || pvcEnd.IsZero() {
+			log.Warnf("CostModel.ComputeAllocation: pvc %s has no running time", key)
+		}
+
+		if _, ok := customPVCMap[key]; !ok {
+			customPVCMap[key] = &customPVC{}
+		}
+
+		customPVCMap[key].Namespace = namespace
+		customPVCMap[key].Name = name
+		customPVCMap[key].StorageClass = storageClass
+		customPVCMap[key].Start = pvcStart
+		customPVCMap[key].End = pvcEnd
+	}
+
+	for _, v := range resPVCapacityBytes {
+		persistentVolume, err := v.GetString("persistentvolume")
+		if err != nil {
+			log.DedupedWarningf(10, "CostModel.ComputeAllocation: pvc info query result missing field: %s", err)
+			continue
+		}
+		customPVCMap[persistentVolume].Capacity = v.Values[0].Value
+	}
+}
+
 func applyPVCBytesRequested(pvcMap map[pvcKey]*pvc, resPVCBytesRequested []*prom.QueryResult) {
 	for _, res := range resPVCBytesRequested {
 		key, err := resultPVCKey(res, env.GetPromClusterLabel(), "namespace", "persistentvolumeclaim")
@@ -2094,6 +2135,10 @@ func applyPVCsToPods(window opencost.Window, podMap map[podKey]*pod, podPVCMap m
 					Name:    pvc.Volume.Name,
 				}
 
+				if alloc.PVCs == nil {
+					alloc.PVCs = opencost.PVCAllocations{}
+				}
+
 				// Both Cost and byteHours should be multiplied by the coef and divided by count
 				// so that if all allocations with a given pv key are summed the result of those
 				// would be equal to the values of the original pv
@@ -2103,6 +2148,14 @@ func applyPVCsToPods(window opencost.Window, podMap map[podKey]*pod, podPVCMap m
 					ByteHours:  byteHours * coef / count,
 					Cost:       cost * coef / count,
 					ProviderID: pvc.Volume.ProviderID,
+				}
+
+				alloc.PVCs[pvc.Volume.Name] = &opencost.PVCAllocation{
+					Name:         name,
+					Namespace:    pvc.Namespace,
+					Capacity:     pvc.Bytes,
+					StorageClass: pvc.StorageClass,
+					Volume:       pvc.Volume.Name,
 				}
 			}
 		}
@@ -2179,6 +2232,17 @@ func applyUnmountedPVCs(window opencost.Window, podMap map[podKey]*pod, pvcMap m
 				},
 			}
 			pod.Allocations[opencost.UnmountedSuffix].PVs = pod.Allocations[opencost.UnmountedSuffix].PVs.Add(unmountedPVs)
+
+			unmountedPVCs := opencost.PVCAllocations{
+				pvc.Volume.Name: {
+					Name:         pvc.Name,
+					StorageClass: pvc.StorageClass,
+					Capacity:     pvc.Bytes,
+					Namespace:    pvc.Namespace,
+					Volume:       pvc.Volume.Name,
+				},
+			}
+			pod.Allocations[opencost.UnmountedSuffix].PVCs = pod.Allocations[opencost.UnmountedSuffix].PVCs.Add(unmountedPVCs)
 		}
 	}
 }

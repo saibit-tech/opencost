@@ -41,6 +41,7 @@ type AllocationJSON struct {
 	PVByteHours                    *float64                        `json:"pvByteHours"`
 	PVCost                         *float64                        `json:"pvCost"`
 	PVs                            PVAllocations                   `json:"pvs"`
+	PVCs                           PVCAllocations                  `json:"pvcs"`
 	PVCostAdjustment               *float64                        `json:"pvCostAdjustment"`
 	RAMBytes                       *float64                        `json:"ramBytes"`
 	RAMByteRequestAverage          *float64                        `json:"ramByteRequestAverage"`

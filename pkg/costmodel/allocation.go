@@ -37,6 +37,8 @@ const (
 	queryFmtPodPVCAllocation            = `avg(avg_over_time(pod_pvc_allocation{%s}[%s])) by (persistentvolume, persistentvolumeclaim, pod, namespace, %s)`
 	queryFmtPVCBytesRequested           = `avg(avg_over_time(kube_persistentvolumeclaim_resource_requests_storage_bytes{%s}[%s])) by (persistentvolumeclaim, namespace, %s)`
 	queryFmtPVActiveMins                = `count(kube_persistentvolume_capacity_bytes{%s}) by (persistentvolume, %s)[%s:%s]`
+	queryPVCapacityBytes                = `avg(kube_persistentvolume_capacity_bytes) by (persistentvolume)`
+	queryPVCInfoSimple                  = `avg(kube_persistentvolumeclaim_info) by (namespacepace, persistentvolumeclaim,storageclass,volumename)`
 	queryFmtPVBytes                     = `avg(avg_over_time(kube_persistentvolume_capacity_bytes{%s}[%s])) by (persistentvolume, %s)`
 	queryFmtPVCostPerGiBHour            = `avg(avg_over_time(pv_hourly_cost{%s}[%s])) by (volumename, %s)`
 	queryFmtPVMeta                      = `avg(avg_over_time(kubecost_pv_info{%s}[%s])) by (%s, persistentvolume, provider_id)`
@@ -455,6 +457,9 @@ func (cm *CostModel) computeAllocation(start, end time.Time, resolution time.Dur
 	queryPVActiveMins := fmt.Sprintf(queryFmtPVActiveMins, env.GetPromClusterFilter(), env.GetPromClusterLabel(), durStr, resStr)
 	resChPVActiveMins := ctx.QueryAtTime(queryPVActiveMins, end)
 
+	//resChPVCapacityBytes := ctx.QueryAtTime(queryPVCapacityBytes, end)
+	//resChPVCInfoSimple := ctx.QueryAtTime(queryPVCInfoSimple, end)
+
 	queryPVBytes := fmt.Sprintf(queryFmtPVBytes, env.GetPromClusterFilter(), durStr, env.GetPromClusterLabel())
 	resChPVBytes := ctx.QueryAtTime(queryPVBytes, end)
 
@@ -553,6 +558,8 @@ func (cm *CostModel) computeAllocation(start, end time.Time, resolution time.Dur
 	nodeExtendedData, _ := queryExtendedNodeData(ctx, start, end, durStr, resStr)
 
 	resPVActiveMins, _ := resChPVActiveMins.Await()
+	//resPVCapacityBytes, _ := resChPVCapacityBytes.Await()
+	//resPVCINfoSimple, _ := resChPVCInfoSimple.Await()
 	resPVBytes, _ := resChPVBytes.Await()
 	resPVCostPerGiBHour, _ := resChPVCostPerGiBHour.Await()
 	resPVMeta, _ := resChPVMeta.Await()
@@ -670,6 +677,9 @@ func (cm *CostModel) computeAllocation(start, end time.Time, resolution time.Dur
 	pvcMap := map[pvcKey]*pvc{}
 	buildPVCMap(resolution, pvcMap, pvMap, resPVCInfo, window)
 	applyPVCBytesRequested(pvcMap, resPVCBytesRequested)
+
+	//customPVCMap := map[string]*customPVC{}
+	//buildCustomPVCMap(resolution, customPVCMap, resPVCapacityBytes, resPVCINfoSimple, window)
 
 	// Build out the relationships of pods to their PVCs. This step
 	// populates the pvc.Count field so that pvc allocation can be
